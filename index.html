@@ -667,6 +667,57 @@ footer.site-footer {
 }
 
 table.wide-scroll-guard { width: 100%; }
+
+/* ---------- Modal (replaces native prompt/confirm, which sandboxed
+   viewers such as the Artifact preview silently block) ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 12, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+.modal-overlay[hidden] { display: none; }
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  width: 100%;
+  max-width: 380px;
+}
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+.modal-message { margin: 0 0 12px; }
+.modal-message:empty { display: none; }
+.modal-input {
+  width: 100%;
+  font: inherit;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+.modal-input[hidden] { display: none; }
+.modal-input:focus { border-color: var(--board-soft); }
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.modal-actions .btn { width: auto; }
 </style>
 </head>
 <body>
@@ -813,6 +864,18 @@ table.wide-scroll-guard { width: 100%; }
   </footer>
 </div>
 
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <h3 class="modal-title" id="modalTitle"></h3>
+    <p class="modal-message hint" id="modalMessage"></p>
+    <input type="text" class="modal-input" id="modalInput" autocomplete="off" />
+    <div class="modal-actions">
+      <button class="btn ghost" id="modalCancel" type="button">Annuller</button>
+      <button class="btn" id="modalOk" type="button">OK</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =========================================================
    DICTIONARY (generated — do not hand-edit; see build script)
@@ -869,7 +932,58 @@ const WORDS = DICT_RAW.split("\n");
     newGameBtn: document.getElementById("newGameBtn"),
     renameGameBtn: document.getElementById("renameGameBtn"),
     deleteGameBtn: document.getElementById("deleteGameBtn"),
+    modalOverlay: document.getElementById("modalOverlay"),
+    modalTitle: document.getElementById("modalTitle"),
+    modalMessage: document.getElementById("modalMessage"),
+    modalInput: document.getElementById("modalInput"),
+    modalOk: document.getElementById("modalOk"),
+    modalCancel: document.getElementById("modalCancel"),
   };
+
+  /* ---------- modal (in-page replacement for prompt()/confirm()) ---------
+     Sandboxed viewers (e.g. the Artifact preview) can silently block the
+     native dialogs, so all "ask the user" moments go through this instead. */
+
+  function openModal({ title, message, showInput, defaultValue, okLabel }) {
+    return new Promise((resolve) => {
+      el.modalTitle.textContent = title || "";
+      el.modalMessage.textContent = message || "";
+      el.modalInput.hidden = !showInput;
+      el.modalInput.value = showInput ? (defaultValue || "") : "";
+      el.modalOk.textContent = okLabel || "OK";
+      el.modalOverlay.hidden = false;
+      if (showInput) { el.modalInput.focus(); el.modalInput.select(); }
+      else el.modalOk.focus();
+
+      function cleanup(result) {
+        el.modalOverlay.hidden = true;
+        el.modalOk.removeEventListener("click", onOk);
+        el.modalCancel.removeEventListener("click", onCancel);
+        el.modalOverlay.removeEventListener("mousedown", onOverlay);
+        document.removeEventListener("keydown", onKeydown, true);
+        resolve(result);
+      }
+      function onOk() { cleanup(showInput ? el.modalInput.value : true); }
+      function onCancel() { cleanup(showInput ? null : false); }
+      function onOverlay(e) { if (e.target === el.modalOverlay) onCancel(); }
+      function onKeydown(e) {
+        if (e.key === "Escape") { e.preventDefault(); onCancel(); }
+        else if (e.key === "Enter") { e.preventDefault(); onOk(); }
+      }
+      el.modalOk.addEventListener("click", onOk);
+      el.modalCancel.addEventListener("click", onCancel);
+      el.modalOverlay.addEventListener("mousedown", onOverlay);
+      document.addEventListener("keydown", onKeydown, true);
+    });
+  }
+
+  function promptModal(title, defaultValue, okLabel) {
+    return openModal({ title, showInput: true, defaultValue, okLabel: okLabel || "OK" });
+  }
+
+  function confirmModal(title, message, okLabel) {
+    return openModal({ title, message, showInput: false, okLabel: okLabel || "Ja, fortsæt" });
+  }
 
   function loadValues() {
     try {
@@ -1332,9 +1446,9 @@ const WORDS = DICT_RAW.split("\n");
 
   el.gameSelect.addEventListener("change", () => switchToGame(el.gameSelect.value));
 
-  el.newGameBtn.addEventListener("click", () => {
+  el.newGameBtn.addEventListener("click", async () => {
     const suggested = "Spil " + (gamesStore.games.length + 1);
-    const name = prompt("Navn på nyt spil:", suggested);
+    const name = await promptModal("Navn på nyt spil", suggested, "Opret");
     if (name === null) return;
     persistActiveBoard();
     const game = makeGame(name.trim() || suggested, [], "");
@@ -1349,19 +1463,20 @@ const WORDS = DICT_RAW.split("\n");
     resetBoardResultsPanel();
   });
 
-  el.renameGameBtn.addEventListener("click", () => {
+  el.renameGameBtn.addEventListener("click", async () => {
     const game = getActiveGame();
-    const name = prompt("Nyt navn til spillet:", game.name);
+    const name = await promptModal("Nyt navn til spillet", game.name, "Gem");
     if (name === null || !name.trim()) return;
     game.name = name.trim();
     saveGamesStore();
     renderGameSelect();
   });
 
-  el.deleteGameBtn.addEventListener("click", () => {
+  el.deleteGameBtn.addEventListener("click", async () => {
     if (gamesStore.games.length <= 1) return;
     const game = getActiveGame();
-    if (!confirm('Slet spillet "' + game.name + '"? Dette kan ikke fortrydes.')) return;
+    const ok = await confirmModal("Slet spil", 'Slet spillet "' + game.name + '"? Dette kan ikke fortrydes.', "Slet");
+    if (!ok) return;
     gamesStore.games = gamesStore.games.filter((g) => g.id !== game.id);
     gamesStore.activeId = gamesStore.games[0].id;
     saveGamesStore();
@@ -1453,9 +1568,10 @@ const WORDS = DICT_RAW.split("\n");
     else if (e.key === "Backspace" && !e.target.value) move(r, c - 1);
   }
 
-  el.clearBoardBtn.addEventListener("click", () => {
+  el.clearBoardBtn.addEventListener("click", async () => {
     if (!boardHasAnyTile()) return;
-    if (!confirm("Ryd brættet for det aktuelle spil? Dette kan ikke fortrydes.")) return;
+    const ok = await confirmModal("Ryd bræt", "Ryd brættet for det aktuelle spil? Dette kan ikke fortrydes.", "Ryd bræt");
+    if (!ok) return;
     boardState = emptyBoard();
     persistActiveBoard();
     undoStacks.set(gamesStore.activeId, []);
