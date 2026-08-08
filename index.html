@@ -38,6 +38,7 @@
   --sq-dl-ink: #1c3a49;
   --sq-empty: var(--surface);
   --sq-center: var(--gold);
+  --placed-bg: #d7ece5;
   --font-display: 'Century Gothic', 'Avenir Next', 'Futura', ui-sans-serif, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
@@ -67,6 +68,7 @@
     --sq-dl-ink: #a9c8da;
     --sq-empty: var(--surface);
     --sq-center: var(--gold);
+    --placed-bg: #163029;
   }
 }
 :root[data-theme="dark"] {
@@ -93,6 +95,7 @@
   --sq-dl-ink: #a9c8da;
   --sq-empty: var(--surface);
   --sq-center: var(--gold);
+  --placed-bg: #163029;
 }
 
 * { box-sizing: border-box; }
@@ -585,6 +588,19 @@ details.settings[open] summary::before { transform: rotate(90deg); }
 .bcell.filled input { background: var(--surface); }
 .bcell.highlight { box-shadow: inset 0 0 0 2px var(--gold); }
 .bcell.highlight.filled { background: var(--gold-soft); }
+.bcell.just-played { box-shadow: inset 0 0 0 2px var(--board-soft); background: var(--placed-bg); }
+.bcell.just-played input { background: var(--placed-bg); }
+.bcell.just-played.highlight { box-shadow: inset 0 0 0 2px var(--gold); background: var(--gold-soft); }
+.bcell.just-played.highlight input { background: var(--gold-soft); }
+
+.legend-inline.just-played-swatch {
+  display: inline-flex;
+  padding: 0 4px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 2px var(--board-soft);
+  background: var(--placed-bg);
+  font-weight: 600;
+}
 
 .board-legend {
   display: flex;
@@ -769,10 +785,11 @@ table.wide-scroll-guard { width: 100%; }
         </div>
         <div class="board-actions">
           <button class="btn" id="findBoardMovesBtn" type="button">Find bedste træk på brættet</button>
+          <button class="btn ghost" id="undoMoveBtn" type="button" disabled>↺ Fortryd sidste træk</button>
           <button class="btn ghost" id="clearBoardBtn" type="button">Ryd bræt</button>
         </div>
         <div class="msg" id="boardMsg" role="status" aria-live="polite"></div>
-        <div class="hint" style="margin-top:10px;">Klik i et felt og skriv bogstavet. Pil-tasterne flytter mellem felter. Tryk <strong>▶</strong> ud for et forslag for at lægge det på brættet med det samme — hånden opdateres, og maskinen finder automatisk det næste bedste træk. Brættet gemmes automatisk i browseren. Eksisterende brikker regnes til fuld bogstavværdi (uden hensyn til om de oprindeligt var en joker).</div>
+        <div class="hint" style="margin-top:10px;">Klik i et felt og skriv bogstavet. Pil-tasterne flytter mellem felter. Tryk <strong>▶</strong> ud for et forslag for at lægge det på brættet med det samme — hånden opdateres, og maskinen finder automatisk det næste bedste træk. Bogstaver maskinen selv har lagt er <span class="legend-inline just-played-swatch">markeret med teal</span> indtil næste træk. Fortryd med knappen ovenfor hvis du vil prøve et andet. Brættet gemmes automatisk i browseren. Eksisterende brikker regnes til fuld bogstavværdi (uden hensyn til om de oprindeligt var en joker).</div>
       </div>
 
       <div class="board-side">
@@ -841,6 +858,7 @@ const WORDS = DICT_RAW.split("\n");
     boardGrid: document.getElementById("boardGrid"),
     findBoardMovesBtn: document.getElementById("findBoardMovesBtn"),
     clearBoardBtn: document.getElementById("clearBoardBtn"),
+    undoMoveBtn: document.getElementById("undoMoveBtn"),
     boardMsg: document.getElementById("boardMsg"),
     boardResultsCount: document.getElementById("boardResultsCount"),
     boardResultList: document.getElementById("boardResultList"),
@@ -1253,6 +1271,31 @@ const WORDS = DICT_RAW.split("\n");
     return false;
   }
 
+  /* ---------- last-played marking + undo (in-memory, per game) ---------- */
+
+  const undoStacks = new Map(); // gameId -> [{ cells:[{r,c}], prevRack }]
+  const lastMoveMap = new Map(); // gameId -> [{r,c}] most recently machine-placed cells
+
+  function getUndoStack(gameId) {
+    if (!undoStacks.has(gameId)) undoStacks.set(gameId, []);
+    return undoStacks.get(gameId);
+  }
+
+  function getLastMoveCells(gameId) {
+    return lastMoveMap.get(gameId) || [];
+  }
+
+  function clearJustPlayedMarks() {
+    lastMoveMap.set(gamesStore.activeId, []);
+    for (const cellEl of el.boardGrid.querySelectorAll(".bcell.just-played")) {
+      cellEl.classList.remove("just-played");
+    }
+  }
+
+  function updateUndoButton() {
+    el.undoMoveBtn.disabled = getUndoStack(gamesStore.activeId).length === 0;
+  }
+
   function resetBoardResultsPanel() {
     el.boardResultList.innerHTML = '<div class="placeholder-state">Placér evt. ord på brættet, skriv dine bogstaver ovenfor, og tryk “Find bedste træk på brættet”.</div>';
     el.boardResultsCount.textContent = "";
@@ -1282,6 +1325,7 @@ const WORDS = DICT_RAW.split("\n");
     el.rack.value = game.rack || "";
     renderBoard();
     renderGameSelect();
+    updateUndoButton();
     resetBoardResultsPanel();
   }
 
@@ -1300,6 +1344,7 @@ const WORDS = DICT_RAW.split("\n");
     el.rack.value = "";
     renderBoard();
     renderGameSelect();
+    updateUndoButton();
     resetBoardResultsPanel();
   });
 
@@ -1319,10 +1364,13 @@ const WORDS = DICT_RAW.split("\n");
     gamesStore.games = gamesStore.games.filter((g) => g.id !== game.id);
     gamesStore.activeId = gamesStore.games[0].id;
     saveGamesStore();
+    undoStacks.delete(game.id);
+    lastMoveMap.delete(game.id);
     boardState = cellsToBoard(getActiveGame().board);
     el.rack.value = getActiveGame().rack || "";
     renderBoard();
     renderGameSelect();
+    updateUndoButton();
     resetBoardResultsPanel();
   });
 
@@ -1342,6 +1390,7 @@ const WORDS = DICT_RAW.split("\n");
       ax.textContent = String(c + 1);
       el.boardGrid.appendChild(ax);
     }
+    const justPlayedSet = new Set(getLastMoveCells(gamesStore.activeId).map((p) => p.r + ":" + p.c));
     boardInputs.length = 0;
     for (let r = 0; r < BOARD_SIZE; r++) {
       const ax = document.createElement("div");
@@ -1352,7 +1401,8 @@ const WORDS = DICT_RAW.split("\n");
       for (let c = 0; c < BOARD_SIZE; c++) {
         const mult = MULT[r][c];
         const cell = document.createElement("div");
-        cell.className = "bcell" + (mult ? " " + MULT_CLASS[mult] : "") + (r === CENTER && c === CENTER ? " center" : "");
+        cell.className = "bcell" + (mult ? " " + MULT_CLASS[mult] : "") + (r === CENTER && c === CENTER ? " center" : "") +
+          (justPlayedSet.has(r + ":" + c) ? " just-played" : "");
         const label = document.createElement("span");
         label.className = "bcell-label";
         label.textContent = mult ? MULT_LABEL[mult] : (r === CENTER && c === CENTER ? "★" : "");
@@ -1383,6 +1433,7 @@ const WORDS = DICT_RAW.split("\n");
     input.value = ch;
     boardState[r][c] = ch || null;
     cell.classList.toggle("filled", !!ch);
+    if (getLastMoveCells(gamesStore.activeId).length) clearJustPlayedMarks();
     persistActiveBoard();
     if (ch && c < BOARD_SIZE - 1) boardInputs[r][c + 1].focus();
   }
@@ -1406,8 +1457,11 @@ const WORDS = DICT_RAW.split("\n");
     if (!confirm("Ryd brættet for det aktuelle spil? Dette kan ikke fortrydes.")) return;
     boardState = emptyBoard();
     persistActiveBoard();
+    undoStacks.set(gamesStore.activeId, []);
+    lastMoveMap.set(gamesStore.activeId, []);
     renderBoard();
     renderGameSelect();
+    updateUndoButton();
     resetBoardResultsPanel();
   });
 
@@ -1616,6 +1670,15 @@ const WORDS = DICT_RAW.split("\n");
   }
 
   function playMove(move) {
+    const prevRack = el.rack.value;
+    const filledCells = [];
+    for (let i = 0; i <= move.end - move.start; i++) {
+      if (!move.letters[i].isNew) continue;
+      const r = move.orientation === "row" ? move.index : move.start + i;
+      const c = move.orientation === "row" ? move.start + i : move.index;
+      filledCells.push({ r, c });
+    }
+
     applyMoveToBoard(move);
     persistActiveBoard();
 
@@ -1624,14 +1687,36 @@ const WORDS = DICT_RAW.split("\n");
     const game = getActiveGame();
     if (game) { game.rack = newRack; saveGamesStore(); }
 
+    getUndoStack(gamesStore.activeId).push({ cells: filledCells, prevRack });
+    lastMoveMap.set(gamesStore.activeId, filledCells);
+    updateUndoButton();
+
     renderBoard();
     renderGameSelect();
-    highlightMove(move, true);
-    setTimeout(() => highlightMove(move, false), 1000);
 
     if (currentResults.length || el.pattern.value) runSearch();
     runBoardSearch('Lagde “' + move.word.toUpperCase() + '” på brættet (' + move.score + ' point).');
   }
+
+  el.undoMoveBtn.addEventListener("click", () => {
+    const stack = getUndoStack(gamesStore.activeId);
+    const entry = stack.pop();
+    if (!entry) return;
+    for (const { r, c } of entry.cells) boardState[r][c] = null;
+    persistActiveBoard();
+
+    el.rack.value = entry.prevRack;
+    const game = getActiveGame();
+    if (game) { game.rack = entry.prevRack; saveGamesStore(); }
+
+    lastMoveMap.set(gamesStore.activeId, []);
+    updateUndoButton();
+    renderBoard();
+    renderGameSelect();
+
+    if (currentResults.length || el.pattern.value) runSearch();
+    runBoardSearch("Trækket blev fortrudt.");
+  });
 
   const BOARD_PAGE_SIZE = 100;
 
@@ -1692,6 +1777,7 @@ const WORDS = DICT_RAW.split("\n");
   el.rack.value = getActiveGame().rack || "";
   renderGameSelect();
   renderBoard();
+  updateUndoButton();
   renderValueGrid();
 })();
 </script>

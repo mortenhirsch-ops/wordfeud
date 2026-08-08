@@ -24,6 +24,8 @@ Under det frie forslag ligger et rigtigt 15×15 Wordfeud-bræt med de faktiske b
 3. Tryk **Find bedste træk på brættet**. Maskinen scanner alle rækker og kolonner for felter der kan udfyldes ud fra dine bogstaver og de eksisterende brikker, og viser de bedst scorende træk — med reel score inkl. bonusfelter, samt hvor på brættet ordet placeres. Hold musen over et forslag for at fremhæve det på brættet.
 4. Tryk **▶** ud for et forslag for at lægge det på brættet med det samme. Hånden opdateres automatisk (de brugte bogstaver/jokere fjernes), og maskinen søger straks efter det næste bedste træk — så du kan klikke dig igennem flere træk i træk.
 
+De bogstaver maskinen selv har lagt på brættet er tydeligt markeret (teal ramme/baggrund) indtil du spiller et nyt træk. Fortryder du dig, kan du trykke **↺ Fortryd sidste træk** for at rulle det seneste (eller flere i træk) tilbage — brættet og hånden føres tilbage til, som de var, og maskinen søger igen, så du kan prøve et andet forslag. Fortryd-historikken er pr. spil, men gemmes kun i browserens hukommelse (ikke på tværs af genindlæsning af siden).
+
 ### Flere spil samtidig
 
 Over brættet kan du skifte mellem flere spil ad gangen — praktisk hvis du har flere Wordfeud-kampe kørende samtidig. Hvert spil husker sit eget bræt og sin egen hånd, og alt gemmes automatisk i browseren.
