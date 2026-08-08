@@ -23,6 +23,17 @@ Under det frie forslag ligger et rigtigt 15×15 Wordfeud-bræt med de faktiske b
 2. Skriv dine bogstaver i "Bogstaver på hånden" ovenfor.
 3. Tryk **Find bedste træk på brættet**. Maskinen scanner alle rækker og kolonner for felter der kan udfyldes ud fra dine bogstaver og de eksisterende brikker, og viser de bedst scorende træk — med reel score inkl. bonusfelter, samt hvor på brættet ordet placeres. Hold musen over et forslag for at fremhæve det på brættet.
 
+### Flere spil samtidig
+
+Over brættet kan du skifte mellem flere spil ad gangen — praktisk hvis du har flere Wordfeud-kampe kørende samtidig. Hvert spil husker sit eget bræt og sin egen hånd, og alt gemmes automatisk i browseren.
+
+- **Vælg spil**: dropdown'en skifter mellem dine gemte spil.
+- **+ Nyt spil**: opretter et tomt bræt under et nyt navn.
+- **Omdøb**: giver det valgte spil et nyt navn.
+- **Slet spil**: fjerner det valgte spil (kun aktiv når der er mere end ét).
+
+Data gemmes lokalt i browseren (`localStorage`) — de følger ikke med hvis du åbner siden i en anden browser eller på en anden enhed.
+
 **Begrænsning**: maskinen tjekker kun, at det trukne ord selv er gyldigt — den tjekker *ikke*, om nye ord der opstår på tværs af trækket (krydsord) også er gyldige. Den finder heller ikke træk der kun rører en eksisterende brik på tværs uden at dele et felt med den. Eksisterende brikker på brættet regnes altid til fuld bogstavværdi, uanset om de oprindeligt blev lagt med en joker.
 
 ## Hvordan det virker

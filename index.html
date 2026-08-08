@@ -467,6 +467,24 @@ details.settings[open] summary::before { transform: rotate(90deg); }
 @media (max-width: 980px) {
   .board-layout { grid-template-columns: 1fr; }
 }
+.game-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.game-row select {
+  width: auto;
+  flex: 1 1 220px;
+  min-width: 160px;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+}
+.game-row .btn.ghost { width: auto; }
 .board-head {
   display: flex;
   justify-content: space-between;
@@ -710,7 +728,15 @@ table.wide-scroll-guard { width: 100%; }
     <div class="board-head">
       <h2 class="section-title" style="margin-bottom:0;">Wordfeud-brættet</h2>
     </div>
-    <div class="hint" style="margin-bottom:4px;">Placér de ord der allerede ligger på brættet, og find så det bedste næste træk ud fra bogstaverne i feltet “Bogstaver på hånden” ovenfor.</div>
+    <div class="hint" style="margin-bottom:10px;">Placér de ord der allerede ligger på brættet, og find så det bedste næste træk ud fra bogstaverne i feltet “Bogstaver på hånden” ovenfor. Du kan have flere spil i gang samtidig — hvert spil husker sit eget bræt og sin egen hånd.</div>
+
+    <div class="game-row">
+      <label class="sr-only" for="gameSelect">Vælg spil</label>
+      <select id="gameSelect"></select>
+      <button class="btn ghost" id="newGameBtn" type="button">+ Nyt spil</button>
+      <button class="btn ghost" id="renameGameBtn" type="button">Omdøb</button>
+      <button class="btn ghost" id="deleteGameBtn" type="button">Slet spil</button>
+    </div>
 
     <div class="board-layout">
       <div>
@@ -802,6 +828,10 @@ const WORDS = DICT_RAW.split("\n");
     boardResultList: document.getElementById("boardResultList"),
     boardMoreRow: document.getElementById("boardMoreRow"),
     boardMoreBtn: document.getElementById("boardMoreBtn"),
+    gameSelect: document.getElementById("gameSelect"),
+    newGameBtn: document.getElementById("newGameBtn"),
+    renameGameBtn: document.getElementById("renameGameBtn"),
+    deleteGameBtn: document.getElementById("deleteGameBtn"),
   };
 
   function loadValues() {
@@ -1096,7 +1126,8 @@ const WORDS = DICT_RAW.split("\n");
      ========================================================= */
   const BOARD_SIZE = 15;
   const CENTER = 7;
-  const BOARD_STORAGE_KEY = "wordfeud-ordmaskine:board";
+  const GAMES_STORAGE_KEY = "wordfeud-ordmaskine:games";
+  const LEGACY_BOARD_KEY = "wordfeud-ordmaskine:board";
 
   const RAW_TILEMAP = [
     {x:0,y:0,m:'TB'},{x:4,y:0,m:'TO'},{x:7,y:0,m:'DB'},{x:10,y:0,m:'TO'},{x:14,y:0,m:'TB'},
@@ -1121,43 +1152,166 @@ const WORDS = DICT_RAW.split("\n");
   const MULT_LABEL = { TB: "TB", DB: "DB", TO: "TO", DO: "DO" };
   const MULT_CLASS = { TB: "tl", DB: "dl", TO: "tw", DO: "dw" };
 
-  let boardState = loadBoard();
+  /* ---------- games (multiple boards, saved side by side) ---------- */
 
   function emptyBoard() {
     return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null));
   }
 
-  function loadBoard() {
-    try {
-      const raw = localStorage.getItem(BOARD_STORAGE_KEY);
-      if (!raw) return emptyBoard();
-      const cells = JSON.parse(raw);
-      const b = emptyBoard();
-      for (const c of cells) {
-        if (c && c.r >= 0 && c.r < BOARD_SIZE && c.c >= 0 && c.c < BOARD_SIZE && ALPHABET.includes(c.ch)) {
-          b[c.r][c.c] = c.ch;
-        }
-      }
-      return b;
-    } catch (e) {
-      return emptyBoard();
-    }
-  }
-
-  function saveBoard() {
+  function boardToCells(board) {
     const cells = [];
     for (let r = 0; r < BOARD_SIZE; r++) {
       for (let c = 0; c < BOARD_SIZE; c++) {
-        if (boardState[r][c]) cells.push({ r, c, ch: boardState[r][c] });
+        if (board[r][c]) cells.push({ r, c, ch: board[r][c] });
       }
     }
-    try { localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(cells)); } catch (e) {}
+    return cells;
   }
+
+  function cellsToBoard(cells) {
+    const b = emptyBoard();
+    if (Array.isArray(cells)) {
+      for (const cell of cells) {
+        if (cell && cell.r >= 0 && cell.r < BOARD_SIZE && cell.c >= 0 && cell.c < BOARD_SIZE && ALPHABET.includes(cell.ch)) {
+          b[cell.r][cell.c] = cell.ch;
+        }
+      }
+    }
+    return b;
+  }
+
+  function makeGame(name, cells, rack) {
+    return {
+      id: "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      name, board: cells || [], rack: rack || "", updatedAt: Date.now(),
+    };
+  }
+
+  function loadGamesStore() {
+    try {
+      const raw = localStorage.getItem(GAMES_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.games) && parsed.games.length) {
+          if (!parsed.games.some((g) => g.id === parsed.activeId)) parsed.activeId = parsed.games[0].id;
+          return parsed;
+        }
+      }
+    } catch (e) {}
+
+    // First run, or upgrading from the single-board v1 format: migrate
+    // whatever was there into "Spil 1" so nothing gets lost.
+    let legacyCells = [];
+    try {
+      const rawLegacy = localStorage.getItem(LEGACY_BOARD_KEY);
+      if (rawLegacy) legacyCells = JSON.parse(rawLegacy) || [];
+    } catch (e) {}
+    const first = makeGame("Spil 1", legacyCells, "");
+    return { games: [first], activeId: first.id };
+  }
+
+  let gamesStore = loadGamesStore();
+
+  function saveGamesStore() {
+    try { localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(gamesStore)); } catch (e) {}
+  }
+
+  function getActiveGame() {
+    return gamesStore.games.find((g) => g.id === gamesStore.activeId) || gamesStore.games[0];
+  }
+
+  function persistActiveBoard() {
+    const game = getActiveGame();
+    if (!game) return;
+    game.board = boardToCells(boardState);
+    game.updatedAt = Date.now();
+    saveGamesStore();
+  }
+
+  let boardState = cellsToBoard(getActiveGame().board);
 
   function boardHasAnyTile() {
     for (let r = 0; r < BOARD_SIZE; r++) for (let c = 0; c < BOARD_SIZE; c++) if (boardState[r][c]) return true;
     return false;
   }
+
+  function resetBoardResultsPanel() {
+    el.boardResultList.innerHTML = '<div class="placeholder-state">Placér evt. ord på brættet, skriv dine bogstaver ovenfor, og tryk “Find bedste træk på brættet”.</div>';
+    el.boardResultsCount.textContent = "";
+    el.boardMoreRow.style.display = "none";
+    el.boardMsg.textContent = "";
+  }
+
+  function renderGameSelect() {
+    el.gameSelect.innerHTML = "";
+    for (const g of gamesStore.games) {
+      const opt = document.createElement("option");
+      opt.value = g.id;
+      const count = g.board.length;
+      opt.textContent = g.name + (count ? " (" + count + " brik" + (count === 1 ? "" : "ker") + ")" : "");
+      if (g.id === gamesStore.activeId) opt.selected = true;
+      el.gameSelect.appendChild(opt);
+    }
+    el.deleteGameBtn.disabled = gamesStore.games.length <= 1;
+  }
+
+  function switchToGame(id) {
+    persistActiveBoard();
+    gamesStore.activeId = id;
+    saveGamesStore();
+    const game = getActiveGame();
+    boardState = cellsToBoard(game.board);
+    el.rack.value = game.rack || "";
+    renderBoard();
+    renderGameSelect();
+    resetBoardResultsPanel();
+  }
+
+  el.gameSelect.addEventListener("change", () => switchToGame(el.gameSelect.value));
+
+  el.newGameBtn.addEventListener("click", () => {
+    const suggested = "Spil " + (gamesStore.games.length + 1);
+    const name = prompt("Navn på nyt spil:", suggested);
+    if (name === null) return;
+    persistActiveBoard();
+    const game = makeGame(name.trim() || suggested, [], "");
+    gamesStore.games.push(game);
+    gamesStore.activeId = game.id;
+    saveGamesStore();
+    boardState = emptyBoard();
+    el.rack.value = "";
+    renderBoard();
+    renderGameSelect();
+    resetBoardResultsPanel();
+  });
+
+  el.renameGameBtn.addEventListener("click", () => {
+    const game = getActiveGame();
+    const name = prompt("Nyt navn til spillet:", game.name);
+    if (name === null || !name.trim()) return;
+    game.name = name.trim();
+    saveGamesStore();
+    renderGameSelect();
+  });
+
+  el.deleteGameBtn.addEventListener("click", () => {
+    if (gamesStore.games.length <= 1) return;
+    const game = getActiveGame();
+    if (!confirm('Slet spillet "' + game.name + '"? Dette kan ikke fortrydes.')) return;
+    gamesStore.games = gamesStore.games.filter((g) => g.id !== game.id);
+    gamesStore.activeId = gamesStore.games[0].id;
+    saveGamesStore();
+    boardState = cellsToBoard(getActiveGame().board);
+    el.rack.value = getActiveGame().rack || "";
+    renderBoard();
+    renderGameSelect();
+    resetBoardResultsPanel();
+  });
+
+  el.rack.addEventListener("input", () => {
+    const game = getActiveGame();
+    if (game) { game.rack = el.rack.value; saveGamesStore(); }
+  });
 
   const boardInputs = [];
 
@@ -1211,7 +1365,7 @@ const WORDS = DICT_RAW.split("\n");
     input.value = ch;
     boardState[r][c] = ch || null;
     cell.classList.toggle("filled", !!ch);
-    saveBoard();
+    persistActiveBoard();
     if (ch && c < BOARD_SIZE - 1) boardInputs[r][c + 1].focus();
   }
 
@@ -1231,13 +1385,12 @@ const WORDS = DICT_RAW.split("\n");
 
   el.clearBoardBtn.addEventListener("click", () => {
     if (!boardHasAnyTile()) return;
-    if (!confirm("Ryd hele brættet? Dette kan ikke fortrydes.")) return;
+    if (!confirm("Ryd brættet for det aktuelle spil? Dette kan ikke fortrydes.")) return;
     boardState = emptyBoard();
-    saveBoard();
+    persistActiveBoard();
     renderBoard();
-    el.boardResultList.innerHTML = '<div class="placeholder-state">Placér evt. ord på brættet, skriv dine bogstaver ovenfor, og tryk “Find bedste træk på brættet”.</div>';
-    el.boardResultsCount.textContent = "";
-    el.boardMoreRow.style.display = "none";
+    renderGameSelect();
+    resetBoardResultsPanel();
   });
 
   /* ---------- board move-finding ---------- */
@@ -1463,6 +1616,8 @@ const WORDS = DICT_RAW.split("\n");
     }, 10);
   });
 
+  el.rack.value = getActiveGame().rack || "";
+  renderGameSelect();
   renderBoard();
   renderValueGrid();
 })();
