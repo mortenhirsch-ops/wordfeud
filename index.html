@@ -444,6 +444,24 @@ details.settings[open] summary::before { transform: rotate(90deg); }
 }
 .result-row.top1 .word-score { color: var(--board); }
 
+.play-btn {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--board);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.play-btn:hover { background: var(--board); color: var(--board-ink); border-color: var(--board); }
+.play-btn:active { transform: translateY(1px); }
+
 .empty-state, .placeholder-state {
   padding: 34px 12px;
   text-align: center;
@@ -754,7 +772,7 @@ table.wide-scroll-guard { width: 100%; }
           <button class="btn ghost" id="clearBoardBtn" type="button">Ryd bræt</button>
         </div>
         <div class="msg" id="boardMsg" role="status" aria-live="polite"></div>
-        <div class="hint" style="margin-top:10px;">Klik i et felt og skriv bogstavet. Pil-tasterne flytter mellem felter. Brættet gemmes automatisk i browseren. Eksisterende brikker regnes til fuld bogstavværdi (uden hensyn til om de oprindeligt var en joker).</div>
+        <div class="hint" style="margin-top:10px;">Klik i et felt og skriv bogstavet. Pil-tasterne flytter mellem felter. Tryk <strong>▶</strong> ud for et forslag for at lægge det på brættet med det samme — hånden opdateres, og maskinen finder automatisk det næste bedste træk. Brættet gemmes automatisk i browseren. Eksisterende brikker regnes til fuld bogstavværdi (uden hensyn til om de oprindeligt var en joker).</div>
       </div>
 
       <div class="board-side">
@@ -1545,10 +1563,18 @@ const WORDS = DICT_RAW.split("\n");
     const score = document.createElement("span");
     score.className = "word-score";
     score.textContent = move.score;
+    const playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "play-btn";
+    playBtn.title = "Læg “" + move.word.toUpperCase() + "” på brættet";
+    playBtn.setAttribute("aria-label", "Læg " + move.word.toUpperCase() + " på brættet");
+    playBtn.textContent = "▶";
+    playBtn.addEventListener("click", (e) => { e.stopPropagation(); playMove(move); });
     row.appendChild(rank);
     row.appendChild(tiles);
     row.appendChild(pos);
     row.appendChild(score);
+    row.appendChild(playBtn);
     row.addEventListener("mouseenter", () => highlightMove(move, true));
     row.addEventListener("mouseleave", () => highlightMove(move, false));
     return row;
@@ -1561,6 +1587,50 @@ const WORDS = DICT_RAW.split("\n");
       const input = boardInputs[r][c];
       if (input) input.closest(".bcell").classList.toggle("highlight", on);
     }
+  }
+
+  // Writes a chosen move's newly-placed letters onto the board, removes the
+  // tiles it used from the rack, and re-searches for the next best move —
+  // so picking a suggestion is a one-click "play it and see what's next".
+  function applyMoveToBoard(move) {
+    for (let i = 0; i <= move.end - move.start; i++) {
+      const r = move.orientation === "row" ? move.index : move.start + i;
+      const c = move.orientation === "row" ? move.start + i : move.index;
+      boardState[r][c] = move.letters[i].ch;
+    }
+  }
+
+  function consumeRackForMove(move, rackRaw) {
+    const rack = parseRack(rackRaw);
+    const counts = Object.assign({}, rack.counts);
+    let blanks = rack.blanks;
+    for (const letterMeta of move.letters) {
+      if (!letterMeta.isNew) continue;
+      if (letterMeta.isBlank) blanks = Math.max(0, blanks - 1);
+      else counts[letterMeta.ch] = Math.max(0, (counts[letterMeta.ch] || 0) - 1);
+    }
+    let result = "";
+    for (const ch of ALPHABET) result += ch.repeat(counts[ch] || 0);
+    result += "?".repeat(blanks);
+    return result;
+  }
+
+  function playMove(move) {
+    applyMoveToBoard(move);
+    persistActiveBoard();
+
+    const newRack = consumeRackForMove(move, el.rack.value);
+    el.rack.value = newRack;
+    const game = getActiveGame();
+    if (game) { game.rack = newRack; saveGamesStore(); }
+
+    renderBoard();
+    renderGameSelect();
+    highlightMove(move, true);
+    setTimeout(() => highlightMove(move, false), 1000);
+
+    if (currentResults.length || el.pattern.value) runSearch();
+    runBoardSearch('Lagde “' + move.word.toUpperCase() + '” på brættet (' + move.score + ' point).');
   }
 
   const BOARD_PAGE_SIZE = 100;
@@ -1594,27 +1664,30 @@ const WORDS = DICT_RAW.split("\n");
     el.boardMoreRow.style.display = currentBoardMoves.length > boardShownCount ? "" : "none";
   });
 
-  el.findBoardMovesBtn.addEventListener("click", () => {
+  function runBoardSearch(notePrefix) {
     const minLen = parseInt(el.minlen.value, 10) || 1;
     const maxLen = parseInt(el.maxlen.value, 10) || 15;
-    el.boardMsg.textContent = "Søger…";
+    el.boardMsg.textContent = notePrefix ? notePrefix + " Søger næste træk…" : "Søger…";
     el.findBoardMovesBtn.disabled = true;
     setTimeout(() => {
       const { moves, error, truncated } = findBoardMoves(el.rack.value, minLen, maxLen);
       el.findBoardMovesBtn.disabled = false;
       if (error) {
-        el.boardMsg.textContent = error;
+        el.boardMsg.textContent = (notePrefix ? notePrefix + " " : "") + error;
         currentBoardMoves = [];
         el.boardResultList.innerHTML = '<div class="placeholder-state">' + error + '</div>';
         el.boardResultsCount.textContent = "";
         el.boardMoreRow.style.display = "none";
         return;
       }
-      el.boardMsg.textContent = truncated ? "Bemærk: brættet gav meget bredt søgefelt — resultatet er afkortet." : "";
+      const note = truncated ? "Bemærk: brættet gav meget bredt søgefelt — resultatet er afkortet." : "";
+      el.boardMsg.textContent = [notePrefix, note].filter(Boolean).join(" ");
       currentBoardMoves = moves;
       renderBoardResults();
     }, 10);
-  });
+  }
+
+  el.findBoardMovesBtn.addEventListener("click", () => runBoardSearch());
 
   el.rack.value = getActiveGame().rack || "";
   renderGameSelect();

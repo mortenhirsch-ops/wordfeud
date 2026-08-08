@@ -22,6 +22,7 @@ Under det frie forslag ligger et rigtigt 15×15 Wordfeud-bræt med de faktiske b
 1. Klik i et felt og skriv de bogstaver der allerede ligger på brættet i dit spil (piletasterne flytter mellem felter). Brættet gemmes automatisk i browseren.
 2. Skriv dine bogstaver i "Bogstaver på hånden" ovenfor.
 3. Tryk **Find bedste træk på brættet**. Maskinen scanner alle rækker og kolonner for felter der kan udfyldes ud fra dine bogstaver og de eksisterende brikker, og viser de bedst scorende træk — med reel score inkl. bonusfelter, samt hvor på brættet ordet placeres. Hold musen over et forslag for at fremhæve det på brættet.
+4. Tryk **▶** ud for et forslag for at lægge det på brættet med det samme. Hånden opdateres automatisk (de brugte bogstaver/jokere fjernes), og maskinen søger straks efter det næste bedste træk — så du kan klikke dig igennem flere træk i træk.
 
 ### Flere spil samtidig
 
