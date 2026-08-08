@@ -28,6 +28,16 @@
   --warn: #a13b2f;
   --shadow: 0 1px 0 rgba(30, 43, 38, 0.05), 0 6px 16px -8px rgba(30, 43, 38, 0.25);
   --radius: 10px;
+  --sq-tw: #b3452e;
+  --sq-tw-ink: #fdf6ec;
+  --sq-dw: #e8bcac;
+  --sq-dw-ink: #5c2d1d;
+  --sq-tl: #2c6a8c;
+  --sq-tl-ink: #fdf6ec;
+  --sq-dl: #bfd9e6;
+  --sq-dl-ink: #1c3a49;
+  --sq-empty: var(--surface);
+  --sq-center: var(--gold);
   --font-display: 'Century Gothic', 'Avenir Next', 'Futura', ui-sans-serif, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
@@ -47,6 +57,16 @@
     --border: #33413a;
     --warn: #e2887c;
     --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 24px -10px rgba(0, 0, 0, 0.6);
+    --sq-tw: #8a4230;
+    --sq-tw-ink: #fbe9de;
+    --sq-dw: #4a352c;
+    --sq-dw-ink: #e8bcac;
+    --sq-tl: #2b5670;
+    --sq-tl-ink: #dcecf5;
+    --sq-dl: #223540;
+    --sq-dl-ink: #a9c8da;
+    --sq-empty: var(--surface);
+    --sq-center: var(--gold);
   }
 }
 :root[data-theme="dark"] {
@@ -63,6 +83,16 @@
   --border: #33413a;
   --warn: #e2887c;
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 10px 24px -10px rgba(0, 0, 0, 0.6);
+  --sq-tw: #8a4230;
+  --sq-tw-ink: #fbe9de;
+  --sq-dw: #4a352c;
+  --sq-dw-ink: #e8bcac;
+  --sq-tl: #2b5670;
+  --sq-tl-ink: #dcecf5;
+  --sq-dl: #223540;
+  --sq-dl-ink: #a9c8da;
+  --sq-empty: var(--surface);
+  --sq-center: var(--gold);
 }
 
 * { box-sizing: border-box; }
@@ -401,6 +431,7 @@ details.settings[open] summary::before { transform: rotate(90deg); }
   color: var(--ink-soft);
 }
 .tile.blank { color: var(--board-soft); }
+.tile.existing { box-shadow: inset 0 0 0 2px var(--board-soft); }
 .word-score {
   font-family: var(--font-mono);
   font-weight: 700;
@@ -423,6 +454,143 @@ details.settings[open] summary::before { transform: rotate(90deg); }
 .more-row {
   text-align: center;
   padding: 10px 0 2px;
+}
+
+/* ---------- Board ---------- */
+.board-section { margin-top: 22px; }
+.board-layout {
+  display: grid;
+  grid-template-columns: minmax(380px, 520px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 980px) {
+  .board-layout { grid-template-columns: 1fr; }
+}
+.board-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.board-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.board-grid {
+  display: grid;
+  grid-template-columns: 20px repeat(15, 28px);
+  grid-template-rows: 20px repeat(15, 28px);
+  gap: 2px;
+  width: max-content;
+  margin-top: 10px;
+}
+.board-axis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+}
+.bcell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 26px;
+  min-height: 26px;
+  background: var(--sq-empty);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bcell.tw { background: var(--sq-tw); }
+.bcell.dw { background: var(--sq-dw); }
+.bcell.tl { background: var(--sq-tl); }
+.bcell.dl { background: var(--sq-dl); }
+.bcell.center { background: var(--sq-empty); box-shadow: inset 0 0 0 2px var(--sq-center); }
+.bcell-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+.bcell.tw .bcell-label { color: var(--sq-tw-ink); }
+.bcell.tl .bcell-label { color: var(--sq-tl-ink); }
+.bcell.dw .bcell-label { color: var(--sq-dw-ink); }
+.bcell.dl .bcell-label { color: var(--sq-dl-ink); }
+.bcell.center .bcell-label { color: var(--sq-center); font-size: 0.7rem; }
+.bcell input {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  text-align: center;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0;
+  color: var(--ink);
+  caret-color: var(--board-soft);
+}
+.bcell input:focus { outline: 2px solid var(--gold); outline-offset: -2px; z-index: 1; }
+.bcell.filled { background: var(--surface); border-color: var(--ink-soft); }
+.bcell.filled .bcell-label { opacity: 0; }
+.bcell.filled input { background: var(--surface); }
+.bcell.highlight { box-shadow: inset 0 0 0 2px var(--gold); }
+.bcell.highlight.filled { background: var(--gold-soft); }
+
+.board-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 12px;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+}
+.board-legend .swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.board-legend .swatch i {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  display: inline-block;
+}
+.board-legend .swatch.tw i { background: var(--sq-tw); }
+.board-legend .swatch.dw i { background: var(--sq-dw); }
+.board-legend .swatch.tl i { background: var(--sq-tl); }
+.board-legend .swatch.dl i { background: var(--sq-dl); }
+
+.board-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.board-actions .btn { width: auto; flex: 1; min-width: 180px; }
+
+.board-side .results-count { margin-top: 0; }
+.pos-label {
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  flex: none;
+  width: 11ch;
+  text-align: left;
+  line-height: 1.25;
 }
 
 /* ---------- Footer ---------- */
@@ -538,9 +706,49 @@ table.wide-scroll-guard { width: 100%; }
 
   </div>
 
+  <section class="card panel board-section">
+    <div class="board-head">
+      <h2 class="section-title" style="margin-bottom:0;">Wordfeud-brættet</h2>
+    </div>
+    <div class="hint" style="margin-bottom:4px;">Placér de ord der allerede ligger på brættet, og find så det bedste næste træk ud fra bogstaverne i feltet “Bogstaver på hånden” ovenfor.</div>
+
+    <div class="board-layout">
+      <div>
+        <div class="board-scroll">
+          <div class="board-grid" id="boardGrid" role="grid" aria-label="Wordfeud-bræt, 15 gange 15 felter"></div>
+        </div>
+        <div class="board-legend">
+          <span class="swatch tw"><i></i>TO &ndash; tredobbelt ord</span>
+          <span class="swatch dw"><i></i>DO &ndash; dobbelt ord</span>
+          <span class="swatch tl"><i></i>TB &ndash; tredobbelt bogstav</span>
+          <span class="swatch dl"><i></i>DB &ndash; dobbelt bogstav</span>
+        </div>
+        <div class="board-actions">
+          <button class="btn" id="findBoardMovesBtn" type="button">Find bedste træk på brættet</button>
+          <button class="btn ghost" id="clearBoardBtn" type="button">Ryd bræt</button>
+        </div>
+        <div class="msg" id="boardMsg" role="status" aria-live="polite"></div>
+        <div class="hint" style="margin-top:10px;">Klik i et felt og skriv bogstavet. Pil-tasterne flytter mellem felter. Brættet gemmes automatisk i browseren. Eksisterende brikker regnes til fuld bogstavværdi (uden hensyn til om de oprindeligt var en joker).</div>
+      </div>
+
+      <div class="board-side">
+        <div class="results-head">
+          <h2 class="section-title" style="margin-bottom:0;">Bedste træk</h2>
+        </div>
+        <div class="results-count" id="boardResultsCount"></div>
+        <div class="result-list" id="boardResultList">
+          <div class="placeholder-state">Placér evt. ord på brættet, skriv dine bogstaver ovenfor, og tryk “Find bedste træk på brættet”.</div>
+        </div>
+        <div class="more-row" id="boardMoreRow" style="display:none;">
+          <button class="btn ghost" id="boardMoreBtn" type="button">Vis flere</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <footer class="site-footer">
     <div>Ordbog: ca. 479.000 danske bøjningsformer afledt af Den Danske Ordbogs fuldformsliste (DSL / korpus.dsl.dk). Ikke identisk med Wordfeuds officielle, proprietære ordliste — brug som stærk rettesnor, ikke som facitliste.</div>
-    <div>Point er ordets grundværdi (sum af bogstavværdier). Den faktiske score i spillet afhænger desuden af bonusfelter på brættet, som denne maskine ikke kender.</div>
+    <div>“Frit forslag” viser ordets grundværdi (sum af bogstavværdier) uden hensyn til brættet. “Wordfeud-brættet” nedenfor bruger brættets rigtige bonusfelter (dobbelt/tredobbelt bogstav/ord) og viser derfor den reelle score for det trukne felt — men tjekker ikke, om ord der opstår på tværs af trækket også er gyldige.</div>
   </footer>
 </div>
 
@@ -586,6 +794,14 @@ const WORDS = DICT_RAW.split("\n");
     moreBtn: document.getElementById("moreBtn"),
     valueGrid: document.getElementById("valueGrid"),
     resetValues: document.getElementById("resetValues"),
+    boardGrid: document.getElementById("boardGrid"),
+    findBoardMovesBtn: document.getElementById("findBoardMovesBtn"),
+    clearBoardBtn: document.getElementById("clearBoardBtn"),
+    boardMsg: document.getElementById("boardMsg"),
+    boardResultsCount: document.getElementById("boardResultsCount"),
+    boardResultList: document.getElementById("boardResultList"),
+    boardMoreRow: document.getElementById("boardMoreRow"),
+    boardMoreBtn: document.getElementById("boardMoreBtn"),
   };
 
   function loadValues() {
@@ -870,6 +1086,384 @@ const WORDS = DICT_RAW.split("\n");
   el.rack.addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
   el.pattern.addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
 
+  /* =========================================================
+     BOARD
+     15x15 bonus-square layout reverse-engineered from the real
+     Wordfeud client/API (board geometry is shared across all
+     language editions). DB/TB = double/triple letter (dobbelt/
+     tredobbelt bogstav), DO/TO = double/triple word (dobbelt/
+     tredobbelt ord). Center square carries no bonus in Wordfeud.
+     ========================================================= */
+  const BOARD_SIZE = 15;
+  const CENTER = 7;
+  const BOARD_STORAGE_KEY = "wordfeud-ordmaskine:board";
+
+  const RAW_TILEMAP = [
+    {x:0,y:0,m:'TB'},{x:4,y:0,m:'TO'},{x:7,y:0,m:'DB'},{x:10,y:0,m:'TO'},{x:14,y:0,m:'TB'},
+    {x:0,y:14,m:'TB'},{x:4,y:14,m:'TO'},{x:7,y:14,m:'DB'},{x:10,y:14,m:'TO'},{x:14,y:14,m:'TB'},
+    {x:2,y:1,m:'DB'},{x:5,y:1,m:'TB'},{x:9,y:1,m:'TB'},{x:13,y:1,m:'DB'},
+    {x:2,y:13,m:'DB'},{x:5,y:13,m:'TB'},{x:9,y:13,m:'TB'},{x:13,y:13,m:'DB'},
+    {x:2,y:2,m:'DO'},{x:6,y:2,m:'DB'},{x:8,y:2,m:'DB'},{x:12,y:2,m:'DO'},
+    {x:2,y:12,m:'DO'},{x:6,y:12,m:'DB'},{x:8,y:12,m:'DB'},{x:12,y:12,m:'DO'},
+    {x:3,y:3,m:'TB'},{x:7,y:3,m:'DO'},{x:11,y:3,m:'TB'},
+    {x:3,y:11,m:'TB'},{x:7,y:11,m:'DO'},{x:11,y:11,m:'TB'},
+    {x:0,y:4,m:'TO'},{x:4,y:4,m:'DO'},{x:6,y:4,m:'DB'},{x:8,y:4,m:'DB'},{x:10,y:4,m:'DO'},{x:14,y:4,m:'TO'},
+    {x:0,y:10,m:'TO'},{x:4,y:10,m:'DO'},{x:6,y:10,m:'DB'},{x:8,y:10,m:'DB'},{x:10,y:10,m:'DO'},{x:14,y:10,m:'TO'},
+    {x:1,y:5,m:'TB'},{x:5,y:5,m:'TB'},{x:9,y:5,m:'TB'},{x:13,y:5,m:'TB'},
+    {x:1,y:9,m:'TB'},{x:5,y:9,m:'TB'},{x:9,y:9,m:'TB'},{x:13,y:9,m:'TB'},
+    {x:2,y:6,m:'DB'},{x:4,y:6,m:'DB'},{x:10,y:6,m:'DB'},{x:12,y:6,m:'DB'},
+    {x:2,y:8,m:'DB'},{x:4,y:8,m:'DB'},{x:10,y:8,m:'DB'},{x:12,y:8,m:'DB'},
+    {x:0,y:7,m:'DB'},{x:3,y:7,m:'DO'},{x:11,y:7,m:'DO'},{x:14,y:7,m:'DB'},
+  ];
+  const MULT = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null));
+  for (const t of RAW_TILEMAP) MULT[t.y][t.x] = t.m;
+
+  const MULT_LABEL = { TB: "TB", DB: "DB", TO: "TO", DO: "DO" };
+  const MULT_CLASS = { TB: "tl", DB: "dl", TO: "tw", DO: "dw" };
+
+  let boardState = loadBoard();
+
+  function emptyBoard() {
+    return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(null));
+  }
+
+  function loadBoard() {
+    try {
+      const raw = localStorage.getItem(BOARD_STORAGE_KEY);
+      if (!raw) return emptyBoard();
+      const cells = JSON.parse(raw);
+      const b = emptyBoard();
+      for (const c of cells) {
+        if (c && c.r >= 0 && c.r < BOARD_SIZE && c.c >= 0 && c.c < BOARD_SIZE && ALPHABET.includes(c.ch)) {
+          b[c.r][c.c] = c.ch;
+        }
+      }
+      return b;
+    } catch (e) {
+      return emptyBoard();
+    }
+  }
+
+  function saveBoard() {
+    const cells = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (boardState[r][c]) cells.push({ r, c, ch: boardState[r][c] });
+      }
+    }
+    try { localStorage.setItem(BOARD_STORAGE_KEY, JSON.stringify(cells)); } catch (e) {}
+  }
+
+  function boardHasAnyTile() {
+    for (let r = 0; r < BOARD_SIZE; r++) for (let c = 0; c < BOARD_SIZE; c++) if (boardState[r][c]) return true;
+    return false;
+  }
+
+  const boardInputs = [];
+
+  function renderBoard() {
+    el.boardGrid.innerHTML = "";
+    el.boardGrid.appendChild(document.createElement("div"));
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const ax = document.createElement("div");
+      ax.className = "board-axis";
+      ax.textContent = String(c + 1);
+      el.boardGrid.appendChild(ax);
+    }
+    boardInputs.length = 0;
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      const ax = document.createElement("div");
+      ax.className = "board-axis";
+      ax.textContent = String(r + 1);
+      el.boardGrid.appendChild(ax);
+      const rowInputs = [];
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        const mult = MULT[r][c];
+        const cell = document.createElement("div");
+        cell.className = "bcell" + (mult ? " " + MULT_CLASS[mult] : "") + (r === CENTER && c === CENTER ? " center" : "");
+        const label = document.createElement("span");
+        label.className = "bcell-label";
+        label.textContent = mult ? MULT_LABEL[mult] : (r === CENTER && c === CENTER ? "★" : "");
+        const input = document.createElement("input");
+        input.setAttribute("maxlength", "1");
+        input.setAttribute("aria-label", "Række " + (r + 1) + ", kolonne " + (c + 1));
+        input.dataset.r = String(r);
+        input.dataset.c = String(c);
+        if (boardState[r][c]) {
+          input.value = boardState[r][c];
+          cell.classList.add("filled");
+        }
+        input.addEventListener("input", () => onBoardCellInput(r, c, input, cell));
+        input.addEventListener("keydown", (e) => onBoardCellKeydown(e, r, c));
+        cell.appendChild(label);
+        cell.appendChild(input);
+        el.boardGrid.appendChild(cell);
+        rowInputs.push(input);
+      }
+      boardInputs.push(rowInputs);
+    }
+  }
+
+  function onBoardCellInput(r, c, input, cell) {
+    const raw = input.value.toLowerCase().normalize("NFC");
+    let ch = "";
+    for (const ch2 of raw) { if (ALPHABET.includes(ch2)) { ch = ch2; break; } }
+    input.value = ch;
+    boardState[r][c] = ch || null;
+    cell.classList.toggle("filled", !!ch);
+    saveBoard();
+    if (ch && c < BOARD_SIZE - 1) boardInputs[r][c + 1].focus();
+  }
+
+  function onBoardCellKeydown(e, r, c) {
+    const move = (nr, nc) => {
+      if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+        e.preventDefault();
+        boardInputs[nr][nc].focus();
+      }
+    };
+    if (e.key === "ArrowRight") move(r, c + 1);
+    else if (e.key === "ArrowLeft") move(r, c - 1);
+    else if (e.key === "ArrowDown") move(r + 1, c);
+    else if (e.key === "ArrowUp") move(r - 1, c);
+    else if (e.key === "Backspace" && !e.target.value) move(r, c - 1);
+  }
+
+  el.clearBoardBtn.addEventListener("click", () => {
+    if (!boardHasAnyTile()) return;
+    if (!confirm("Ryd hele brættet? Dette kan ikke fortrydes.")) return;
+    boardState = emptyBoard();
+    saveBoard();
+    renderBoard();
+    el.boardResultList.innerHTML = '<div class="placeholder-state">Placér evt. ord på brættet, skriv dine bogstaver ovenfor, og tryk “Find bedste træk på brættet”.</div>';
+    el.boardResultsCount.textContent = "";
+    el.boardMoreRow.style.display = "none";
+  });
+
+  /* ---------- board move-finding ---------- */
+
+  function multVal(m) { return m === "TB" ? 3 : m === "DB" ? 2 : 1; }
+
+  // Finds maximal open/anchored spans on one 15-cell line.
+  function findSlotsForLine(cells, hasAnyTile, isCenterLine, minLen, maxLen) {
+    const slots = [];
+    const n = BOARD_SIZE;
+    for (let c1 = 0; c1 < n; c1++) {
+      if (c1 > 0 && cells[c1 - 1]) continue;
+      for (let c2 = c1; c2 < n; c2++) {
+        if (c2 < n - 1 && cells[c2 + 1]) continue;
+        const len = c2 - c1 + 1;
+        if (len < 2 || len < minLen || len > maxLen) continue;
+        let hasExisting = false, hasEmpty = false;
+        for (let p = c1; p <= c2; p++) { if (cells[p]) hasExisting = true; else hasEmpty = true; }
+        if (!hasEmpty) continue;
+        const connected = hasExisting || (!hasAnyTile && isCenterLine && c1 <= CENTER && CENTER <= c2);
+        if (!connected) continue;
+        slots.push({ c1, c2 });
+      }
+    }
+    return slots;
+  }
+
+  // Checks whether `word` fits the given span on `cells`/`multLine`, and if
+  // so returns { score, letters:[{ch,isNew,isBlank}, ...] } using the real
+  // board multipliers, with blanks optimally assigned to the lowest-value
+  // open occurrences of each repeated letter.
+  function evaluateBoardWord(word, cells, multLine, start, rackCounts, rackBlanks) {
+    const len = word.length;
+    const letters = new Array(len);
+    let fixedScore = 0;
+    const openByLetter = new Map();
+    for (let i = 0; i < len; i++) {
+      const p = start + i;
+      const ch = word[i];
+      if (cells[p]) {
+        if (cells[p] !== ch) return null;
+        fixedScore += letterValues[ch] || 0;
+        letters[i] = { ch, isNew: false, isBlank: false };
+      } else {
+        const tileScore = (letterValues[ch] || 0) * multVal(multLine[p]);
+        if (!openByLetter.has(ch)) openByLetter.set(ch, []);
+        openByLetter.get(ch).push({ i, mult: multLine[p], tileScore });
+      }
+    }
+    if (openByLetter.size === 0) return null;
+
+    let openScore = 0, blanksNeeded = 0, wordMultiplier = 1;
+    for (const [ch, list] of openByLetter) {
+      const have = rackCounts[ch] || 0;
+      const n = list.length;
+      const blankCount = Math.max(0, n - have);
+      blanksNeeded += blankCount;
+      list.sort((a, b) => a.tileScore - b.tileScore);
+      list.forEach((item, idx) => {
+        const isBlank = idx < blankCount;
+        letters[item.i] = { ch, isNew: true, isBlank };
+        openScore += isBlank ? 0 : item.tileScore;
+        if (item.mult === "DO") wordMultiplier *= 2;
+        else if (item.mult === "TO") wordMultiplier *= 3;
+      });
+    }
+    if (blanksNeeded > rackBlanks) return null;
+    return { score: (fixedScore + openScore) * wordMultiplier, letters };
+  }
+
+  const MAX_BOARD_SLOTS = 4000;
+
+  function findBoardMoves(rackRaw, minLen, maxLen) {
+    const rack = parseRack(rackRaw);
+    if (rack.total === 0) return { moves: [], rack, error: "Skriv dine bogstaver i feltet “Bogstaver på hånden” ovenfor." };
+
+    const hasAnyTile = boardHasAnyTile();
+    const bestByWord = new Map();
+    let slotCount = 0;
+    let truncated = false;
+
+    const lines = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      lines.push({ orientation: "row", index: r, cells: boardState[r], mult: MULT[r], isCenterLine: r === CENTER });
+    }
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const cells = [], mult = [];
+      for (let r = 0; r < BOARD_SIZE; r++) { cells.push(boardState[r][c]); mult.push(MULT[r][c]); }
+      lines.push({ orientation: "col", index: c, cells, mult, isCenterLine: c === CENTER });
+    }
+
+    outer:
+    for (const line of lines) {
+      const slots = findSlotsForLine(line.cells, hasAnyTile, line.isCenterLine, Math.max(2, minLen), Math.min(BOARD_SIZE, maxLen));
+      for (const slot of slots) {
+        if (slotCount++ > MAX_BOARD_SLOTS) { truncated = true; break outer; }
+        const len = slot.c2 - slot.c1 + 1;
+        const bucket = wordsByLength[len];
+        if (!bucket) continue;
+        for (let i = 0; i < bucket.length; i++) {
+          const word = bucket[i];
+          const res = evaluateBoardWord(word, line.cells, line.mult, slot.c1, rack.counts, rack.blanks);
+          if (!res) continue;
+          const prev = bestByWord.get(word);
+          if (!prev || res.score > prev.score) {
+            bestByWord.set(word, {
+              word, score: res.score, letters: res.letters,
+              orientation: line.orientation, index: line.index, start: slot.c1, end: slot.c2,
+            });
+          }
+        }
+      }
+    }
+
+    const moves = Array.from(bestByWord.values());
+    return { moves, rack, error: null, truncated };
+  }
+
+  /* ---------- board rendering ---------- */
+
+  let currentBoardMoves = [];
+  let boardShownCount = 0;
+
+  function boardTileHtml(letterMeta) {
+    const cls = ["tile"];
+    if (letterMeta.isBlank) cls.push("blank");
+    if (!letterMeta.isNew) cls.push("existing");
+    const pv = letterMeta.isBlank ? 0 : (letterValues[letterMeta.ch] || 0);
+    return '<span class="' + cls.join(" ") + '">' + letterMeta.ch.toUpperCase() +
+      '<span class="pv">' + pv + '</span></span>';
+  }
+
+  function posLabel(move) {
+    if (move.orientation === "row") {
+      return "Vandret<br>Rk " + (move.index + 1) + ", kol " + (move.start + 1) + "–" + (move.end + 1);
+    }
+    return "Lodret<br>Kol " + (move.index + 1) + ", rk " + (move.start + 1) + "–" + (move.end + 1);
+  }
+
+  function renderBoardRow(move, index) {
+    const row = document.createElement("div");
+    row.className = "result-row" + (index === 0 ? " top1" : index === 1 ? " top2" : index === 2 ? " top3" : "");
+    const rank = document.createElement("span");
+    rank.className = "rank";
+    rank.textContent = String(index + 1) + ".";
+    const tiles = document.createElement("span");
+    tiles.className = "tiles";
+    tiles.innerHTML = move.letters.map(boardTileHtml).join("");
+    const pos = document.createElement("span");
+    pos.className = "pos-label";
+    pos.innerHTML = posLabel(move);
+    const score = document.createElement("span");
+    score.className = "word-score";
+    score.textContent = move.score;
+    row.appendChild(rank);
+    row.appendChild(tiles);
+    row.appendChild(pos);
+    row.appendChild(score);
+    row.addEventListener("mouseenter", () => highlightMove(move, true));
+    row.addEventListener("mouseleave", () => highlightMove(move, false));
+    return row;
+  }
+
+  function highlightMove(move, on) {
+    for (let i = 0; i <= move.end - move.start; i++) {
+      const r = move.orientation === "row" ? move.index : move.start + i;
+      const c = move.orientation === "row" ? move.start + i : move.index;
+      const input = boardInputs[r][c];
+      if (input) input.closest(".bcell").classList.toggle("highlight", on);
+    }
+  }
+
+  const BOARD_PAGE_SIZE = 100;
+
+  function renderBoardResults() {
+    currentBoardMoves.sort((a, b) => b.score - a.score || b.word.length - a.word.length || a.word.localeCompare(b.word, "da"));
+    el.boardResultList.innerHTML = "";
+    if (!currentBoardMoves.length) {
+      el.boardResultList.innerHTML = '<div class="empty-state">Ingen gyldige træk fundet med de bogstaver på det nuværende bræt.</div>';
+      el.boardResultsCount.textContent = "";
+      el.boardMoreRow.style.display = "none";
+      return;
+    }
+    boardShownCount = Math.min(BOARD_PAGE_SIZE, currentBoardMoves.length);
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < boardShownCount; i++) frag.appendChild(renderBoardRow(currentBoardMoves[i], i));
+    el.boardResultList.appendChild(frag);
+    el.boardResultsCount.innerHTML = "<strong>" + currentBoardMoves.length + "</strong> træk fundet" +
+      (currentBoardMoves.length > boardShownCount ? " &middot; viser " + boardShownCount : "");
+    el.boardMoreRow.style.display = currentBoardMoves.length > boardShownCount ? "" : "none";
+  }
+
+  el.boardMoreBtn.addEventListener("click", () => {
+    const prevCount = boardShownCount;
+    boardShownCount = Math.min(boardShownCount + BOARD_PAGE_SIZE, currentBoardMoves.length);
+    const frag = document.createDocumentFragment();
+    for (let i = prevCount; i < boardShownCount; i++) frag.appendChild(renderBoardRow(currentBoardMoves[i], i));
+    el.boardResultList.appendChild(frag);
+    el.boardResultsCount.innerHTML = "<strong>" + currentBoardMoves.length + "</strong> træk fundet" +
+      (currentBoardMoves.length > boardShownCount ? " &middot; viser " + boardShownCount : "");
+    el.boardMoreRow.style.display = currentBoardMoves.length > boardShownCount ? "" : "none";
+  });
+
+  el.findBoardMovesBtn.addEventListener("click", () => {
+    const minLen = parseInt(el.minlen.value, 10) || 1;
+    const maxLen = parseInt(el.maxlen.value, 10) || 15;
+    el.boardMsg.textContent = "Søger…";
+    el.findBoardMovesBtn.disabled = true;
+    setTimeout(() => {
+      const { moves, error, truncated } = findBoardMoves(el.rack.value, minLen, maxLen);
+      el.findBoardMovesBtn.disabled = false;
+      if (error) {
+        el.boardMsg.textContent = error;
+        currentBoardMoves = [];
+        el.boardResultList.innerHTML = '<div class="placeholder-state">' + error + '</div>';
+        el.boardResultsCount.textContent = "";
+        el.boardMoreRow.style.display = "none";
+        return;
+      }
+      el.boardMsg.textContent = truncated ? "Bemærk: brættet gav meget bredt søgefelt — resultatet er afkortet." : "";
+      currentBoardMoves = moves;
+      renderBoardResults();
+    }, 10);
+  });
+
+  renderBoard();
   renderValueGrid();
 })();
 </script>
