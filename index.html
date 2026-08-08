@@ -809,7 +809,7 @@ table.wide-scroll-guard { width: 100%; }
 
   <footer class="site-footer">
     <div>Ordbog: ca. 479.000 danske bøjningsformer afledt af Den Danske Ordbogs fuldformsliste (DSL / korpus.dsl.dk). Ikke identisk med Wordfeuds officielle, proprietære ordliste — brug som stærk rettesnor, ikke som facitliste.</div>
-    <div>“Frit forslag” viser ordets grundværdi (sum af bogstavværdier) uden hensyn til brættet. “Wordfeud-brættet” nedenfor bruger brættets rigtige bonusfelter (dobbelt/tredobbelt bogstav/ord) og viser derfor den reelle score for det trukne felt — men tjekker ikke, om ord der opstår på tværs af trækket også er gyldige.</div>
+    <div>“Frit forslag” viser ordets grundværdi (sum af bogstavværdier) uden hensyn til brættet. “Wordfeud-brættet” nedenfor bruger brættets rigtige bonusfelter (dobbelt/tredobbelt bogstav/ord) og tjekker desuden, at alle ord der opstår på tværs af trækket (krydsord) også findes i ordbogen — ugyldige krydsord bliver sorteret fra, og gyldige tæller med i scoren. Den finder dog stadig ikke træk der kun rører en eksisterende brik på tværs uden selv at dele et felt med den.</div>
   </footer>
 </div>
 
@@ -835,6 +835,7 @@ const WORDS = DICT_RAW.split("\n");
 
   let letterValues = loadValues();
   const wordsByLength = groupByLength(WORDS);
+  const WORD_SET = new Set(WORDS);
 
   let currentResults = [];
   let shownCount = 0;
@@ -1533,6 +1534,47 @@ const WORDS = DICT_RAW.split("\n");
     return { score: (fixedScore + openScore) * wordMultiplier, letters };
   }
 
+  // For every newly-placed letter, checks the word it forms in the *other*
+  // direction (by extending through already-occupied neighbour cells).
+  // Returns null if any such crossing word isn't in the dictionary — the
+  // whole candidate move is then illegal and must be discarded. Otherwise
+  // returns the combined score of all valid crossing words, which counts
+  // toward the move's total (same as in real Wordfeud).
+  function crossCheckAndScore(orientation, lineIndex, start, letters) {
+    let bonus = 0;
+    for (let i = 0; i < letters.length; i++) {
+      const lm = letters[i];
+      if (!lm.isNew) continue;
+      const r = orientation === "row" ? lineIndex : start + i;
+      const c = orientation === "row" ? start + i : lineIndex;
+      const mult = MULT[r][c];
+      let tileScore = (lm.isBlank ? 0 : (letterValues[lm.ch] || 0)) * multVal(mult);
+      let wordMultiplier = mult === "DO" ? 2 : mult === "TO" ? 3 : 1;
+      let word = lm.ch;
+      let crossScore = tileScore;
+
+      if (orientation === "row") {
+        let rr = r - 1, prefix = "";
+        while (rr >= 0 && boardState[rr][c]) { prefix = boardState[rr][c] + prefix; crossScore += letterValues[boardState[rr][c]] || 0; rr--; }
+        let rr2 = r + 1, suffix = "";
+        while (rr2 < BOARD_SIZE && boardState[rr2][c]) { suffix += boardState[rr2][c]; crossScore += letterValues[boardState[rr2][c]] || 0; rr2++; }
+        word = prefix + word + suffix;
+      } else {
+        let cc = c - 1, prefix = "";
+        while (cc >= 0 && boardState[r][cc]) { prefix = boardState[r][cc] + prefix; crossScore += letterValues[boardState[r][cc]] || 0; cc--; }
+        let cc2 = c + 1, suffix = "";
+        while (cc2 < BOARD_SIZE && boardState[r][cc2]) { suffix += boardState[r][cc2]; crossScore += letterValues[boardState[r][cc2]] || 0; cc2++; }
+        word = prefix + word + suffix;
+      }
+
+      if (word.length > 1) {
+        if (!WORD_SET.has(word)) return null;
+        bonus += crossScore * wordMultiplier;
+      }
+    }
+    return bonus;
+  }
+
   const MAX_BOARD_SLOTS = 4000;
 
   function findBoardMoves(rackRaw, minLen, maxLen) {
@@ -1566,10 +1608,13 @@ const WORDS = DICT_RAW.split("\n");
           const word = bucket[i];
           const res = evaluateBoardWord(word, line.cells, line.mult, slot.c1, rack.counts, rack.blanks);
           if (!res) continue;
+          const crossBonus = crossCheckAndScore(line.orientation, line.index, slot.c1, res.letters);
+          if (crossBonus === null) continue;
+          const totalScore = res.score + crossBonus;
           const prev = bestByWord.get(word);
-          if (!prev || res.score > prev.score) {
+          if (!prev || totalScore > prev.score) {
             bestByWord.set(word, {
-              word, score: res.score, letters: res.letters,
+              word, score: totalScore, letters: res.letters,
               orientation: line.orientation, index: line.index, start: slot.c1, end: slot.c2,
             });
           }
