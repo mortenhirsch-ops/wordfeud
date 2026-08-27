@@ -1,0 +1,14 @@
+{
+  "name": "wordfeud-hjaelper",
+  "version": "0.1.0",
+  "description": "Dansk Wordfeud-solver (server-loesning) - klar til deploy paa et subdomaene",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
