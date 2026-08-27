@@ -407,6 +407,23 @@ let dirH = true;           // skriveretning
 let preview = null;        // aktuelt forhåndsvist træk
 let lastResults = [];
 
+async function loadDict() {
+  try {
+    const bin = atob(WORDS_B64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const text = await new Response(stream).text();
+    dict = S.makeDict(text.split('\n').filter(Boolean));
+    $('#status').textContent = '';
+    $('#solve').disabled = false;
+  } catch (e) {
+    $('#status').textContent = 'Kunne ikke indlæse ordbogen.';
+    console.error(e);
+  }
+}
+loadDict();
+
 const boardEl = $('#board');
 const cells = [];
 const BONUSNAME = b => b.lm === 2 ? 'dl' : b.lm === 3 ? 'tl' : b.wm === 2 ? 'dw' : b.wm === 3 ? 'tw' : '';
@@ -489,6 +506,67 @@ document.addEventListener('keydown', e => {
     move(dirH ? 1 : 0, dirH ? 0 : 1);
     preview = null; save(); render(); e.preventDefault();
   }
+});
+
+// ---------- Find/læg ord ----------
+function renderResults(moves) {
+  lastResults = moves;
+  const ul = $('#results');
+  ul.innerHTML = '';
+  moves.forEach((mv, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="w">' + mv.word.toUpperCase() + '</span>' +
+      '<span class="meta">' + mv.tiles + ' brikker</span>' +
+      '<span class="sc">' + mv.score + '</span>';
+    li.addEventListener('click', () => previewMove(i));
+    ul.appendChild(li);
+  });
+}
+function previewMove(i) {
+  preview = lastResults[i];
+  $('#apply').style.display = preview ? 'block' : 'none';
+  Array.from($('#results').children).forEach((li, idx) => li.classList.toggle('active', idx === i));
+  render();
+}
+$('#solve').addEventListener('click', () => {
+  if (!dict) return;
+  const rack = $('#rack').value.trim();
+  if (!rack) return;
+  save();
+  const moves = S.findMoves(board, rack, dict, 20);
+  preview = null;
+  $('#apply').style.display = 'none';
+  renderResults(moves);
+  $('#status').textContent = moves.length ? '' : 'Ingen gyldige træk fundet.';
+  render();
+});
+$('#apply').addEventListener('click', () => {
+  if (!preview) return;
+  for (let k = 0; k < preview.word.length; k++) {
+    const x = preview.horiz ? preview.x + k : preview.x;
+    const y = preview.horiz ? preview.y : preview.y + k;
+    if (!board[y][x].ch) {
+      board[y][x] = { ch: preview.word[k], blank: preview.blanksAt.includes(preview.horiz ? x : y) };
+    }
+  }
+  preview = null; lastResults = [];
+  $('#results').innerHTML = '';
+  $('#apply').style.display = 'none';
+  save(); render();
+});
+$('#clearprev').addEventListener('click', () => {
+  preview = null;
+  $('#apply').style.display = 'none';
+  Array.from($('#results').children).forEach(li => li.classList.remove('active'));
+  render();
+});
+$('#clearboard').addEventListener('click', () => {
+  if (!confirm('Ryd hele brættet?')) return;
+  board = S.emptyBoard();
+  preview = null; lastResults = [];
+  $('#results').innerHTML = '';
+  $('#apply').style.display = 'none';
+  save(); render();
 });
 
 // ---------- Flere spil ----------
@@ -577,4 +655,21 @@ $('#importgame').addEventListener('click', () => {
   const code = prompt('Indsæt bræt-kode:');
   if (!code) return;
   const m = code.trim().match(/^([^ ]+)(?:\s+RACK:([A-ZÆØÅa-zæøå*]*))?$/);
-  if (!m |
+  if (!m) { alert('Kunne ikke aflæse bræt-koden.'); return; }
+  const rows = m[1].split('|');
+  if (rows.length !== 15 || rows.some(r => r.length !== 15)) {
+    alert('Bræt-koden skal være 15 rækker á 15 tegn adskilt af |.');
+    return;
+  }
+  board = deserializeBoard(m[1]);
+  if (m[2] != null) $('#rack').value = m[2];
+  preview = null; lastResults = [];
+  $('#results').innerHTML = '';
+  $('#apply').style.display = 'none';
+  save(); render();
+});
+
+load();
+</script>
+</body>
+</html>
