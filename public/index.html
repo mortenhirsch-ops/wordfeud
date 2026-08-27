@@ -407,7 +407,9 @@ let dirH = true;           // skriveretning
 let preview = null;        // aktuelt forhåndsvist træk
 let lastResults = [];
 
-async function loadDict() {
+// Baggrunds-fallback: bruges kun hvis /api/solve (den rigtige, kuraterede
+// ordbog på serveren) ikke kan nås, fx hvis siden køres uden `npm start`.
+async function loadFallbackDict() {
   try {
     const bin = atob(WORDS_B64);
     const bytes = new Uint8Array(bin.length);
@@ -415,14 +417,13 @@ async function loadDict() {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
     const text = await new Response(stream).text();
     dict = S.makeDict(text.split('\n').filter(Boolean));
-    $('#status').textContent = '';
-    $('#solve').disabled = false;
   } catch (e) {
-    $('#status').textContent = 'Kunne ikke indlæse ordbogen.';
     console.error(e);
   }
 }
-loadDict();
+loadFallbackDict();
+$('#status').textContent = '';
+$('#solve').disabled = false;
 
 const boardEl = $('#board');
 const cells = [];
@@ -528,16 +529,32 @@ function previewMove(i) {
   Array.from($('#results').children).forEach((li, idx) => li.classList.toggle('active', idx === i));
   render();
 }
-$('#solve').addEventListener('click', () => {
-  if (!dict) return;
+$('#solve').addEventListener('click', async () => {
   const rack = $('#rack').value.trim();
   if (!rack) return;
   save();
-  const moves = S.findMoves(board, rack, dict, 20);
+  $('#solve').disabled = true;
+  $('#status').textContent = 'Søger …';
+  let moves, note = '';
+  try {
+    const res = await fetch('/api/solve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ board: serializeBoard(), rack, limit: 20 })
+    });
+    if (!res.ok) throw new Error('server svarede ' + res.status);
+    moves = (await res.json()).moves;
+  } catch (e) {
+    console.error(e);
+    if (!dict) { $('#status').textContent = 'Kunne ikke kontakte serveren, og ingen lokal ordbog er klar endnu.'; $('#solve').disabled = false; return; }
+    moves = S.findMoves(board, rack, dict, 20);
+    note = ' (server ikke tilgængelig — bruger tilnærmet lokal ordbog)';
+  }
   preview = null;
   $('#apply').style.display = 'none';
   renderResults(moves);
-  $('#status').textContent = moves.length ? '' : 'Ingen gyldige træk fundet.';
+  $('#status').textContent = (moves.length ? '' : 'Ingen gyldige træk fundet.') + note;
+  $('#solve').disabled = false;
   render();
 });
 $('#apply').addEventListener('click', () => {
