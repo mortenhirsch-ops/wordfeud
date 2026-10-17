@@ -1,0 +1,17 @@
+{
+  "source_url": "https://ordregister.dk/files/cor1.5.1.0.tsv",
+  "version": "COR 1.5.1.0 / Retskrivningsordbogen 5.1 (2025)",
+  "source_sha256": "1c4d1c06bd676e66be8e8c0af68615c8a892472a05af3b261ba8a9d1f2d2b82b",
+  "word_count": 213673,
+  "words_sha256": "167511e93e09a702af57088d30f35305266d84b1c18e9fadaa1cdb8382f8c06e",
+  "norm_status": [
+    "N"
+  ],
+  "excluded_classes": [
+    "fork",
+    "iflerord",
+    "prop"
+  ],
+  "allowed_form_regex": "[a-pr-vx-zæøå]{2,15}",
+  "verified_against_wordfeud_server": false
+}

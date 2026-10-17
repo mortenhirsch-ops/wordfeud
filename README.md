@@ -41,7 +41,8 @@ Data gemmes lokalt i browseren (`localStorage`) — de følger ikke med hvis du 
 
 ## Hvordan det virker
 
-- **Ordbog**: ca. 479.000 danske bøjningsformer, afledt af [Den Danske Ordbogs fuldformsliste](https://korpus.dsl.dk/resources/details/ddo-fullforms.html) (DSL), via [n0kovo/danish-wordlists](https://github.com/n0kovo/danish-wordlists). Ord med `q`/`w` er fjernet, da disse bogstaver ikke findes som brikker i dansk Wordfeud. Dette er **ikke** identisk med Wordfeuds officielle, proprietære ordliste (den er ikke offentligt tilgængelig) — brug forslagene som stærk rettesnor, ikke som facitliste.
+- **Ordbog**: 213.673 unikke ordformer fra Dansk Sprognævns [COR 1.5.1.0](https://ordregister.dk/), som svarer til Retskrivningsordbogen 5.1 (2025). [Wordfeud oplyser](https://wordfeud.com/dictionaries/), at spillet bruger denne udgave af Retskrivningsordbogen. Listen er filtreret konservativt: kun eksplicit normerede former (`N`), skrevet med små bogstaver, længde 2–15 og kun bogstaver som den eksisterende app understøtter (uden q/w). Egennavne (`prop`), forkortelser (`fork`) og ord registreret som dele af faste udtryk (`iflerord`) udelades, medmindre samme ordform også har en selvstændig tilladt analyse. Tegn, mellemrum og store bogstaver fjernes eller omskrives aldrig for at skabe et ord.
+- **Forsigtigt udvalg**: COR-status `K` (ikke eksplicit normeret, fx automatisk dannede genitiver) og `U` (unormeret) udelades. Det kan udelukke ord som faktisk accepteres af Wordfeud, herunder lovlige genitiver og forkortelser. Listen er ikke verificeret ord for ord mod Wordfeuds interne facitliste, så et fuldstændigt match eller nul afvisninger kan ikke garanteres. Den tidligere DDO-liste blandes ikke ind som reserve.
 - **Bræt-layout**: de 15×15 bonusfelter er hentet fra et open source-projekt ([peterheinum/wordfeud-cheat](https://github.com/peterheinum/wordfeud-cheat)) der har genskabt Wordfeuds bræt-geometri fra den rigtige API — denne er ens på tværs af sprog. Bemærk at Wordfeuds bræt (i modsætning til Scrabble) ikke er fuldt symmetrisk, og at centerfeltet ikke giver bonus.
 - **Point** (frit forslag): ordets grundværdi, summen af bogstavværdierne for de brikker du selv lægger (jokere tæller 0 point). Ingen hensyn til bræt-bonusser.
 - **Point** (bræt): den reelle score inkl. dobbelt/tredobbelt bogstav- og ordfelter for de nyplacerede brikker, plus point for eventuelle gyldige krydsord. Blanke brikker (jokere) tildeles altid den laveste tabte værdi, hvis samme bogstav optræder flere gange i ordet.
@@ -55,16 +56,21 @@ Data gemmes lokalt i browseren (`localStorage`) — de følger ikke med hvis du 
 
 ## Gendan/opdatér ordbogen
 
-Ordbogen i `index.html` er genereret fra en kildefil med ét ord pr. linje. For at opdatere:
+Kør fra projektmappen med Python 3 (kun standardbibliotek):
 
-1. Hent/opdatér kildeordlisten (`ddo_fullforms.txt` fra n0kovo/danish-wordlists).
-2. Filtrér til kun `a-zæøå`, længde 2–15, og fjern ord med `q`/`w`.
-3. Kør et lille script der JSON-encoder ordlisten (adskilt af `\n`) og indsætter den i `DICT_RAW`-konstanten i `<script>`-blokken i `index.html`.
+```sh
+python scripts/update_dictionary.py
+python -m unittest discover -s tests
+```
+
+Scriptet henter den fast angivne officielle COR 1.5.1.0-fil, filtrerer og opdaterer både `DICT_RAW`, kildeoplysningen på siden og `dictionary-manifest.json`. Manifestet registrerer version, kilde, filterregler, antal og SHA-256 for både kildefilen og ordlisten. Scriptet stopper ved ukendt filformat eller normeringsstatus.
+
+En allerede hentet TSV kan bruges med `python scripts/update_dictionary.py --source /sti/til/cor1.5.1.0.tsv`. Der tilføjes ingen egenkonstruerede bøjningsformer eller ord fra andre ordbøger. Ændring af COR-version kræver en bevidst ændring af kilde og filterkontrol; scriptet skifter ikke automatisk til en ny udgave.
 
 ## Begrænsninger
 
-- Ordbogen er en tilnærmelse (se ovenfor) — nogle sjældne/regionale Wordfeud-ord kan mangle, og enkelte ord i listen er muligvis ikke gyldige i selve spillet.
+- Ordlisten er et konservativt udvalg fra samme ordbogsudgave som Wordfeud (se ovenfor). Lovlige ord kan mangle, og spillets interne accept er ikke kontrolleret for hvert ord.
 - "Frit forslag" viser grundværdi uden hensyn til brættets bonusfelter.
 - Bræt-søgningen finder ikke træk der kun rører en eksisterende brik på tværs uden selv at dele et felt med den — kun rækker/kolonner der allerede har mindst én brik, bliver undersøgt.
 - Bogstavværdierne er et velbegrundet bud, ikke en officielt bekræftet tabel.
-- Krydsord tjekkes mod samme (tilnærmede) ordbog som resten af værktøjet — se begrænsningen ovenfor.
+- Krydsord tjekkes mod samme filtrerede ordbog som resten af værktøjet — se begrænsningen ovenfor.
