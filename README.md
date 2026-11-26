@@ -1,10 +1,24 @@
 # Wordfeud Ordmaskine
 
-En selvstændig HTML-side der foreslår de bedste ord ud fra de bogstaver, du har til rådighed i Wordfeud. Kører 100 % i browseren — ingen server, ingen build-trin, ingen data sendes nogen steder.
+En Wordfeud-ordmaskine med et dansk ordregister og et interaktivt bræt. Den kan køre som en statisk HTML-side eller som en lille privat webserver, der gemmer spil på disk og deler dem mellem dine browsere.
 
 ## Brug
 
-Åbn `index.html` i en browser (dobbeltklik virker fint, ingen server påkrævet).
+Åbn `index.html` i en browser for lokal brug. Lokal brug gemmer data i den browser, du bruger.
+
+### Kør med servergemning (Docker)
+
+Byg og start appen med Docker Compose:
+
+```sh
+docker compose up -d --build
+```
+
+Appen lytter på `127.0.0.1:8080`. Peg din eksisterende reverse proxy/Tailscale-adresse på denne port. Porten bindes kun til localhost. Spil gemmes i Docker-volumen `wordfeud-data` under `/data/games.json`, så de overlever genstart og genopbygning af containeren. Lav sikkerhedskopi af volumen for at tage backup af spillene.
+
+Når appen åbnes første gang, indlæser den spil fra serveren. Spil, der allerede findes i browserens lokale lager, overføres automatisk. Hvis serveren allerede har spil, flettes lokale spil ind; ens spil-id'er samles, og den senest ændrede kopi bruges. Efterfølgende ændringer synkroniseres automatisk til serveren. Åbn siden igen på en anden enhed for at hente de fælles spil.
+
+API'et er beregnet til brug på samme private netværk som appen. Eksponér ikke porten direkte på et offentligt netværk uden først at tilføje passende adgangskontrol.
 
 ### Frit forslag (uden bræt)
 
@@ -19,7 +33,7 @@ Bogstavværdierne (point pr. bogstav) kan justeres under "Bogstavværdier (avanc
 
 Under det frie forslag ligger et rigtigt 15×15 Wordfeud-bræt med de faktiske bonusfelter (dobbelt/tredobbelt bogstav og ord).
 
-1. Klik i et felt og skriv de bogstaver der allerede ligger på brættet i dit spil (piletasterne flytter mellem felter). Brættet gemmes automatisk i browseren.
+1. Klik i et felt og skriv de bogstaver der allerede ligger på brættet i dit spil (piletasterne flytter mellem felter). Med Docker-udgaven gemmes bræt og hånd automatisk på serveren.
 2. Skriv dine bogstaver i "Bogstaver på hånden" ovenfor.
 3. Tryk **Find bedste træk på brættet**. Maskinen scanner alle rækker og kolonner for felter der kan udfyldes ud fra dine bogstaver og de eksisterende brikker, tjekker at eventuelle ord der opstår på tværs (krydsord) også er gyldige, og viser de bedst scorende træk — med reel score inkl. bonusfelter og krydsord, samt hvor på brættet ordet placeres. Hold musen over et forslag for at fremhæve det på brættet.
 4. Tryk **▶** ud for et forslag for at lægge det på brættet med det samme. Hånden opdateres automatisk (de brugte bogstaver/jokere fjernes), og maskinen søger straks efter det næste bedste træk — så du kan klikke dig igennem flere træk i træk.
@@ -28,14 +42,14 @@ De bogstaver maskinen selv har lagt på brættet er tydeligt markeret (teal ramm
 
 ### Flere spil samtidig
 
-Over brættet kan du skifte mellem flere spil ad gangen — praktisk hvis du har flere Wordfeud-kampe kørende samtidig. Hvert spil husker sit eget bræt og sin egen hånd, og alt gemmes automatisk i browseren.
+Over brættet kan du skifte mellem flere spil ad gangen — praktisk hvis du har flere Wordfeud-kampe kørende samtidig. Hvert spil husker sit eget bræt og sin egen hånd. Med servergemning synkroniseres de automatisk mellem enheder.
 
 - **Vælg spil**: dropdown'en skifter mellem dine gemte spil.
 - **+ Nyt spil**: opretter et tomt bræt under et nyt navn.
 - **Omdøb**: giver det valgte spil et nyt navn.
 - **Slet spil**: fjerner det valgte spil (kun aktiv når der er mere end ét).
 
-Data gemmes lokalt i browseren (`localStorage`) — de følger ikke med hvis du åbner siden i en anden browser eller på en anden enhed.
+Uden servergemning gemmes data lokalt i browseren (`localStorage`). Med Docker-udgaven deles brætter og hænder via serveren.
 
 **Begrænsning**: maskinen finder ikke træk der kun rører en eksisterende brik på tværs uden selv at dele et felt med den (den kigger kun på rækker/kolonner der allerede har mindst én brik i sig). Eksisterende brikker på brættet regnes altid til fuld bogstavværdi, uanset om de oprindeligt blev lagt med en joker.
 

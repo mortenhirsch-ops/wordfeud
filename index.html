@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Wordfeud Ordmaskine</title>
-<meta name="description" content="Find de bedste Wordfeud-ord ud fra dine bogstaver — offline, uden server." />
+<meta name="description" content="Find de bedste Wordfeud-ord ud fra dine bogstaver." />
 <style>
 /* ============================================================
    TOKENS
@@ -730,7 +730,7 @@ table.wide-scroll-guard { width: 100%; }
       </span>
       <div>
         <h1>Wordfeud Ordmaskine</h1>
-        <div class="tagline">Find de bedste ord ud fra dine bogstaver — kører 100&nbsp;% lokalt i browseren, ingen server, ingen data sendes nogen steder.</div>
+        <div class="tagline">Find de bedste ord ud fra dine bogstaver. Dine spil gemmes på din egen server.</div>
       </div>
     </div>
   </div>
@@ -822,6 +822,7 @@ table.wide-scroll-guard { width: 100%; }
       <button class="btn ghost" id="renameGameBtn" type="button">Omdøb</button>
       <button class="btn ghost" id="deleteGameBtn" type="button">Slet spil</button>
     </div>
+    <div class="hint" id="saveStatus" role="status" aria-live="polite" style="margin:8px 0 12px;">Indlæser gemte spil…</div>
 
     <div class="board-layout">
       <div>
@@ -840,7 +841,7 @@ table.wide-scroll-guard { width: 100%; }
           <button class="btn ghost" id="clearBoardBtn" type="button">Ryd bræt</button>
         </div>
         <div class="msg" id="boardMsg" role="status" aria-live="polite"></div>
-        <div class="hint" style="margin-top:10px;">Klik i et felt og skriv bogstavet. Pil-tasterne flytter mellem felter. Tryk <strong>▶</strong> ud for et forslag for at lægge det på brættet med det samme — hånden opdateres, og maskinen finder automatisk det næste bedste træk. Bogstaver maskinen selv har lagt er <span class="legend-inline just-played-swatch">markeret med teal</span> indtil næste træk. Fortryd med knappen ovenfor hvis du vil prøve et andet. Brættet gemmes automatisk i browseren. Eksisterende brikker regnes til fuld bogstavværdi (uden hensyn til om de oprindeligt var en joker).</div>
+        <div class="hint" style="margin-top:10px;">Klik i et felt og skriv bogstavet. Pil-tasterne flytter mellem felter. Tryk <strong>▶</strong> ud for et forslag for at lægge det på brættet med det samme — hånden opdateres, og maskinen finder automatisk det næste bedste træk. Bogstaver maskinen selv har lagt er <span class="legend-inline just-played-swatch">markeret med teal</span> indtil næste træk. Fortryd med knappen ovenfor hvis du vil prøve et andet. Bræt og hånd gemmes automatisk på serveren. Eksisterende brikker regnes til fuld bogstavværdi (uden hensyn til om de oprindeligt var en joker).</div>
       </div>
 
       <div class="board-side">
@@ -1279,6 +1280,7 @@ const WORDS = DICT_RAW.split("\n");
   const CENTER = 7;
   const GAMES_STORAGE_KEY = "wordfeud-ordmaskine:games";
   const LEGACY_BOARD_KEY = "wordfeud-ordmaskine:board";
+  const GAMES_API_URL = "/api/games";
 
   const RAW_TILEMAP = [
     {x:0,y:0,m:'TB'},{x:4,y:0,m:'TO'},{x:7,y:0,m:'DB'},{x:10,y:0,m:'TO'},{x:14,y:0,m:'TB'},
@@ -1362,10 +1364,117 @@ const WORDS = DICT_RAW.split("\n");
   }
 
   let gamesStore = loadGamesStore();
+  let serverStorageEnabled = false;
+  let saveTimer = null;
 
-  function saveGamesStore() {
+  function setSaveStatus(message, state) {
+    const status = document.getElementById("saveStatus");
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.state = state || "";
+  }
+
+  function writeLocalGamesStore() {
     try { localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(gamesStore)); } catch (e) {}
   }
+
+  function hasSavedLocalGames() {
+    try {
+      return localStorage.getItem(GAMES_STORAGE_KEY) !== null || localStorage.getItem(LEGACY_BOARD_KEY) !== null;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function mergeGameStores(serverStore, localStore, preferLocalActive) {
+    const byId = new Map();
+    for (const game of [...serverStore.games, ...localStore.games]) {
+      const previous = byId.get(game.id);
+      if (!previous || (game.updatedAt || 0) > (previous.updatedAt || 0)) byId.set(game.id, game);
+    }
+    const games = Array.from(byId.values());
+    const localActiveExists = games.some((game) => game.id === localStore.activeId);
+    const serverActiveExists = games.some((game) => game.id === serverStore.activeId);
+    const activeId = preferLocalActive && localActiveExists ? localStore.activeId
+      : (serverActiveExists ? serverStore.activeId : (localActiveExists ? localStore.activeId : games[0].id));
+    return { games, activeId };
+  }
+
+  async function initializeServerStorage() {
+    const boardSection = document.querySelector(".board-section");
+    boardSection.inert = true;
+    el.rack.disabled = true;
+    setSaveStatus("Indlæser gemte spil fra serveren…", "loading");
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      let response;
+      try { response = await fetch(GAMES_API_URL, { cache: "no-store", signal: controller.signal }); }
+      finally { clearTimeout(timeout); }
+      if (!response.ok) throw new Error("Serveren svarede " + response.status);
+      const serverStore = await response.json();
+      if (!serverStore || !Array.isArray(serverStore.games)) throw new Error("Ugyldigt spildataformat");
+
+      if (serverStore.games.length) gamesStore = hasSavedLocalGames() ? mergeGameStores(serverStore, gamesStore) : serverStore;
+      if (!gamesStore.games.length) {
+        const first = makeGame("Spil 1", [], "");
+        gamesStore = { games: [first], activeId: first.id };
+      }
+
+      serverStorageEnabled = true;
+      writeLocalGamesStore();
+      const saveResponse = await fetch(GAMES_API_URL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(gamesStore),
+      });
+      if (!saveResponse.ok) throw new Error("Kunne ikke gemme spillene på serveren");
+      setSaveStatus("Spil gemmes automatisk på serveren", "saved");
+    } catch (error) {
+      serverStorageEnabled = false;
+      setSaveStatus("Servergemning er ikke tilgængelig — gemmer kun i denne browser", "local");
+    } finally {
+      boardSection.inert = false;
+      el.rack.disabled = false;
+      boardState = cellsToBoard(getActiveGame().board);
+      el.rack.value = getActiveGame().rack || "";
+      renderGameSelect();
+      renderBoard();
+      updateUndoButton();
+    }
+  }
+
+  function saveGamesStore() {
+    const game = getActiveGame();
+    if (game) game.updatedAt = Date.now();
+    writeLocalGamesStore();
+    if (!serverStorageEnabled) return;
+    clearTimeout(saveTimer);
+    setSaveStatus("Gemmer ændringer på serveren…", "saving");
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      serverWriteQueue = serverWriteQueue.catch(() => {}).then(async () => {
+        try {
+          const latestResponse = await fetch(GAMES_API_URL, { cache: "no-store" });
+          if (!latestResponse.ok) throw new Error("Serveren svarede " + latestResponse.status);
+          const latestStore = await latestResponse.json();
+          gamesStore = mergeGameStores(latestStore, gamesStore, true);
+          writeLocalGamesStore();
+          const response = await fetch(GAMES_API_URL, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(gamesStore),
+          });
+          if (!response.ok) throw new Error("Serveren svarede " + response.status);
+          if (saveTimer === null) setSaveStatus("Gemt på serveren", "saved");
+        } catch (error) {
+          setSaveStatus("Kunne ikke gemme på serveren — ændringerne er gemt i denne browser", "error");
+        }
+      });
+    }, 250);
+  }
+
+  let serverWriteQueue = Promise.resolve();
 
   function getActiveGame() {
     return gamesStore.games.find((g) => g.id === gamesStore.activeId) || gamesStore.games[0];
@@ -1940,6 +2049,7 @@ const WORDS = DICT_RAW.split("\n");
   renderBoard();
   updateUndoButton();
   renderValueGrid();
+  initializeServerStorage();
 })();
 </script>
 </body>
