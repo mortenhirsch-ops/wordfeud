@@ -1,0 +1,12 @@
+services:
+  wordfeud:
+    build: .
+    container_name: wordfeud
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - wordfeud-data:/data
+
+volumes:
+  wordfeud-data:

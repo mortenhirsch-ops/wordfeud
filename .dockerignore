@@ -1,0 +1,6 @@
+.git
+README.md
+dictionary-manifest.json
+scripts/
+tests/
+__pycache__/
